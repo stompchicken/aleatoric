@@ -2,32 +2,36 @@ var stats, scene, renderer, composer;
 var camera, cameraControls;
 var mesh, wireframe;
 
-var shell_parameters = {
-    A: 2.0,
+var parameters = {
+
+    A: 1.0,
     a: 0.6,
     b: 0.75,
     alpha: 83.0,
     beta: 20.0,
     theta: 8.0,
+    D: 1.0,
+    phi: 0.0,
+    omega: 0.0,
+    mu: 0.0
 }
 
 var config = {
-    wireframe: false,
-    update: function() { generate(shell_parameters) }
 };
 
 
 window.onload = function() {
     var gui = new dat.GUI();
-//    gui.add(config, 'wireframe');
-    gui.add(shell_parameters, 'A', 0.0, 10.0);
-    gui.add(shell_parameters, 'a', 0.0, 10.0);
-    gui.add(shell_parameters, 'b', 0.0, 10.0);
-    gui.add(shell_parameters, 'alpha', 70.0, 90.0);
-    gui.add(shell_parameters, 'beta', 10.0, 90.0);
-    gui.add(shell_parameters, 'theta', 0.0, 20.0);
-    
-    gui.add(config, 'update');
+    gui.add(parameters, 'A', 0.0, 10.0).onChange(function(value) { generate(parameters); });
+    gui.add(parameters, 'a', 0.0, 10.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'b', 0.0, 10.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'alpha', 70.0, 90.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'beta', 0.0, 90.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'theta', 0.0, 20.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'D', -1.0, 1.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'phi', -90.0, 90.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'omega', -90.0, 90.0).onChange(function(value) { generate(parameters); });;
+    gui.add(parameters, 'mu', -90.0, 90.0).onChange(function(value) { generate(parameters); });;
 };
 
 
@@ -47,7 +51,7 @@ function shell(params) {
 
         var result = optionalTarget || new THREE.Vector3();
 
-        var theta = (u - 0.5) * params.theta * Math.PI;
+        var theta = u * params.theta * Math.PI;
         var s = v * Math.PI * 2.0;
 
         var A = params.A;
@@ -62,9 +66,27 @@ function shell(params) {
 
         var res = surface(a, b, s);
 
-        var x = ((A * Math.sin(beta) * Math.cos(theta)) + (Math.cos(s) * Math.cos(theta) * res)) * exp;
-        var y = ((A * Math.sin(beta) * Math.sin(theta)) + (Math.cos(s) * Math.sin(theta) * res)) * exp;
-        var z = ((A * -1.0 * Math.cos(beta)) + (Math.sin(s) * res)) * exp;
+        var D = params.D;
+        var phi = params.phi * (Math.PI / 180.0);
+        var omega = params.omega * (Math.PI / 180.0);
+        var mu = params.mu * (Math.PI / 180.0);
+
+        var x = 0.0;
+        x += A * Math.sin(beta) * Math.cos(theta);
+        x += Math.cos(s + phi) * Math.cos(theta + omega) * res;
+        x -= Math.sin(mu) * Math.sin(s + phi) * Math.sin(theta + omega) * res;
+        x *= D * exp;
+
+        var y = 0.0;
+        y += A * Math.sin(beta) * Math.sin(theta);
+        y += Math.cos(s + phi) * Math.sin(theta + omega) * res;
+        y += Math.sin(mu) * Math.sin(s + phi) * Math.cos(theta + omega) * res;
+        y *= exp;
+
+        var z = 0.0;
+        z += A * -1.0 * Math.cos(beta);
+        z += Math.cos(mu) * Math.sin(s + phi) * res;
+        z *= exp;
 
         return result.set(x, y, z);
 
@@ -76,11 +98,11 @@ function generate(params) {
     var old_geometry = mesh.geometry;
 	mesh.geometry = new THREE.ParametricGeometry(shell(params), 128, 128);
     mesh.geometry.verticesNeedUpdate = true;
-
+/*
     var wireframe = mesh.getObjectByName("wireframe");
     wireframe.geometry = mesh.geometry;
     wireframe.geometry.verticesNeedUpdate = true;
-
+*/
     old_geometry.dispose();
 }
 
@@ -90,7 +112,7 @@ function init(){
 		renderer = new THREE.WebGLRenderer({
 			antialias: true,
 		});
-		renderer.setClearColor(0x444444);
+		renderer.setClearColor(0x203040);
 	} else {
 		Detector.addGetWebGLMessage();
 		return true;
@@ -108,20 +130,40 @@ function init(){
 	scene = new THREE.Scene();
 
 	camera	= new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 100000 );
-	camera.position.set(100, 0, 0);
+	camera.position.set(50, 25, 50);
 	scene.add(camera);
 	cameraControls	= new THREE.OrbitControls(camera, renderer.domElement)
 
+    var shellTexture = new THREE.TextureLoader().load("shell.jpg");
+    shellTexture.wrapS = THREE.RepeatWrapping;
+    shellTexture.wrapT = THREE.RepeatWrapping;
+    shellTexture.repeat.set(16,4);
+    
     var geometry = new THREE.SphereGeometry();
-	var material = new THREE.MeshNormalMaterial({
-        polygonOffset: true,
-        polygonOffsetFactor: 1, // positive value pushes polygon further away
-        polygonOffsetUnits: 1,
-        side: THREE.DoubleSide
+	var material = new THREE.MeshStandardMaterial({
+        side: THREE.DoubleSide,
+        color: 0xf0f0d0,
+        roughness: 0.55,
+        map: shellTexture,
+        metalness: 0.20
     });
 	mesh = new THREE.Mesh(geometry, material);
 	scene.add(mesh);
 
+    var light = new THREE.AmbientLight( 0x808080, 0.5); // soft white light
+    scene.add( light );
+
+    var directionalLight1 = new THREE.DirectionalLight(0x606060);
+    directionalLight1.position.set(0, 1000, 2000);
+    directionalLight1.target = mesh;
+    scene.add(directionalLight1);
+
+    var directionalLight2 = new THREE.DirectionalLight(0x808080);
+    directionalLight2.position.set(1000, 2000, -2000);
+    directionalLight2.target = mesh;
+    scene.add(directionalLight2);
+
+    /*
     var mat = new THREE.LineBasicMaterial({
         color: 0xffffff,
         linewidth: 0.5
@@ -129,8 +171,8 @@ function init(){
 	wireframe = new THREE.LineSegments(geometry, mat);
     wireframe.name = "wireframe";
 	mesh.add(wireframe);
-
-	generate(shell_parameters);
+*/
+	generate(parameters);
 }
 
 function animate() {
@@ -140,7 +182,6 @@ function animate() {
 }
 
 function render() {
-    wireframe.visible = config.wireframe;
     cameraControls.update();
 	renderer.render(scene, camera);
 }
