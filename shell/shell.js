@@ -37,10 +37,10 @@ var presets = {
         "phi": -31.62329829398587,
         "omega": 10.065483370670336,
         "mu": 12.050663449939691,
-        "N": 0,
-        "W1": 1.0,
-        "W2": 1.0,
-        "L": 1.0,
+        "N": 5,
+        "W1": 0.2,
+        "W2": 0.2,
+        "L": 0.05,
         "P": 0
       }
     }
@@ -64,6 +64,10 @@ function randRange(min, max) {
     return (Math.random() * (max - min)) + min;
 }
 
+function randInt(min, max) {
+    return Math.floor(randRange(min, max));
+}
+
 var config = {
     randomise: function() {
         parameters.a = randRange(0.1, 1.0);
@@ -76,6 +80,13 @@ var config = {
         parameters.omega = randRange(-30, 30);
         parameters.mu = randRange(-30, 30);
 
+        parameters.N = randInt(0, 5);
+        parameters.W1 = randRange(0, 2.5);
+        parameters.W2 = randRange(0, 2.5);
+        parameters.L = randRange(0, 1.0);
+        parameters.P = randRange(-45, 45);
+
+        
         generate(parameters);
     }
 }
@@ -103,11 +114,11 @@ window.onload = function() {
     controllers.push(surface.add(parameters, 'mu', -90.0, 90.0));
 
     var nodules = gui.addFolder('Nodules');
-    controllers.push(nodules.add(parameters, 'N', 0, 5));
-    controllers.push(nodules.add(parameters, 'W1', 0, 10.0));
-    controllers.push(nodules.add(parameters, 'W2', 0, 10.0));
-    controllers.push(nodules.add(parameters, 'L', 0, 10.0));
-    controllers.push(nodules.add(parameters, 'P', 0, 180.0));
+    controllers.push(nodules.add(parameters, 'N', 0, 5).step(1));
+    controllers.push(nodules.add(parameters, 'W1', 0, 1.0));
+    controllers.push(nodules.add(parameters, 'W2', 0, 1.0));
+    controllers.push(nodules.add(parameters, 'L', 0, 1.0));
+    controllers.push(nodules.add(parameters, 'P', -90.0, 90.0));
 
     for(var i=0; i<controllers.length; i++) {
         controllers[i].listen();
@@ -117,6 +128,8 @@ window.onload = function() {
     gui.remember(parameters);
     gui.revert();
 };
+
+
 
 
 if(!init()) {
@@ -129,16 +142,20 @@ function surface(a, b, s, theta, N, W1, W2, L, P) {
     var res = 1.0 / Math.sqrt((cos * cos) + (sin * sin));
 
     if(N > 0 && W1 > 0 && W2 > 0) {
-    
-    var tau = Math.PI * 2.0;
-    var x = (N * theta) / tau;
 
-    var l = 0.0;
-    l = (tau / N) * (x - Math.floor(x));
+        P -= Math.PI / 2.0;
+        
+        var tau = Math.PI * 2.0;
+        var x = (N * theta) / tau;
 
-    var exp = 0.0;
-    exp += (2.0*(s - P) / W1) * (2.0*(s - P) / W1);
-    exp += (2.0*l / W2) * (2.0*l / W2);
+        var l = 0.0;
+        l = (tau / N) * (x - Math.floor(x));
+        l -= (tau / (2.0*N));
+        s -= Math.PI;
+        
+        var exp = 0.0;
+        exp += ((2.0*(s - P)) / W1) * ((2.0*(s - P)) / W1);
+        exp += ((2.0*l) / W2) * ((2.0*l) / W2);
 
         var rns = L * Math.exp(-1.0 * exp);
         return res + rns;
@@ -180,7 +197,6 @@ function shell(params) {
 
         var res = surface(a, b, s, theta, N, W1, W2, L, P);
 
-        
         var x = 0.0;
         x += A * Math.sin(beta) * Math.cos(theta);
         x += Math.cos(s + phi) * Math.cos(theta + omega) * res;
@@ -260,7 +276,6 @@ function init(){
 
     // Object
     var geometry = new THREE.TorusKnotGeometry(1, 0.25);
-//     var geometry = new THREE.OctahedronGeometry(10, 256, 256);
 
     var material = new THREE.MeshStandardMaterial({
         side: THREE.DoubleSide,
@@ -271,6 +286,7 @@ function init(){
         bumpScale: 0.1,
         metalness: 0.10
     });
+
 //    var material = new THREE.MeshNormalMaterial({side: THREE.DoubleSide});
 
 	mesh = new THREE.Mesh(geometry, material);
